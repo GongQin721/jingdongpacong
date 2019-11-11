@@ -1,65 +1,50 @@
-# encoding:utf-8
-from bs4 import BeautifulSoup
-import re,requests,json
+# coding:utf-8
 
-totalPage=1000
+import os
+import time
+import json
+import random
+import requests
 
-s=requests.session()#会话对象
-url='https://sclub.jd.com/comment/productPageComments.action'
- #要访问网页所需要的参数值
-data={
-    'callback':'fetchJSON_comment98vv214',#是网页响应采用的json格式，这个一般不相同也不会有太大问题
-    'productId':'12272819',
-    'score':0,
-    'sortType':3,
-    'page':0,
-    'pageSize':10,
-    'isShadowSku':0
+COMMENT_FILE_PATH = 'jd_an3+_comment.txt'
 
-}
+def spider_comment(page=0):
+    url = 'https://sclub.jd.com/comment/productPageComments.action?callback=fetchJSON_comment98vv2736&productId=100001845588'\
+          '&score=0&sortType=6&page=%s&pageSize=10&isShadowSku=0&rid=0&fold=1'%page
+    kv = {'user-agent': 'Mozilla/5.0', 'Referer': 'https://item.jd.com/100001845588.html'}
 
-def write_to_file(contents):
-    
-    with open('result.txt','a',encoding='utf-8') as f:
-        
-        for content in contents:
-            
-            f.write(json.dumps(content, ensure_ascii=False)+'\n')
-            
-            #json序列化默认使用ascii编码，这里禁用ascii
-        f.close()
-
-def getData(j):
-    commentSummary=j['comments']
-    
-    for comment in commentSummary:#对结果进行迭代
-        ##遍历列表，用一个生成器来存储遍历到的结果，重新编写字典
-       
-        yield{
-                'client_name':comment['nickname'],
-                'date_comment':comment['referenceTime'],
-                'comment':comment['content'],
-                'client':comment['userClientShow']
-              }#每次遇到yield关键字后返回相应结果，并保留函数当前的运行状态，等待下一次的调用。
-        
-        # print('{} {} {}\n{}\n'.format(c_name,c_time,c_client,c_content))
-
-while True:
-    t=s.get(url,params=data).text#回值t就是我们构建的评论网址的     内容
-    #往这个URL地址传送data里面的数据，params是添加到url的请求字符串中的，用于get请求
     try:
-        t=re.search('(?<=fetchJSON_comment98vv214\().*(?=\);)',t).group(0)
-        #re.search()函数将对整个字符串进行搜索，并返回第一个匹配的字符串的match对象，匹配到的整个字符串/整个正则匹配的内容
-    except Exception as e:
-        break
-    j=json.loads(t)
-    ##将爬取下来的内容转化成可以被json解析的字典格式
-    infos=getData(j)
-    write_to_file(infos)
-    #每一次迭代，每一次中断，写入一次数据
-    data['page']+=1
-    if data['page']>=totalPage:
-        break    
+        r = requests.get(url, headers=kv)
+        r.raise_for_status()
+    except:
+        print('scrapy fail')
+
+    r_json_str = r.text[26:-2]
+
+    r_json_obj = json.loads(r_json_str)
+
+    r_json_comments = r_json_obj['comments']
+
+    for r_json_comment in r_json_comments:
+
+        with open(COMMENT_FILE_PATH, 'a') as file:
+            file.write(r_json_comment['content'] + '\n')
+
+    file.close()
+
+
+def batch_spider_comment():
+
+    if os.path.exists(COMMENT_FILE_PATH):
+        os.remove(COMMENT_FILE_PATH)
+    for i in range(100):
+        spider_comment(i)
+        time.sleep(random.random() * 5)
+
+if __name__ == '__main__':
+    batch_spider_comment()
+
+
 
 
 
